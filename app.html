@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Civic Reporting System</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web@2.1.1/dist/phosphor-web.js"></script>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIINfQ7oFpSlw8yS1c6e0vL6L6A7zW2g6Z0=" crossorigin=""/>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #F8FAFC;
+        }
+        #map {
+            height: 500px;
+            width: 100%;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .leaflet-pane img {
+            max-width: none !important;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-4 min-h-screen flex flex-col items-center">
+
+    <div id="loader" class="absolute inset-0 flex items-center justify-center bg-gray-100 z-50 transition-opacity duration-300">
+        <div class="flex flex-col items-center p-8 bg-white rounded-xl shadow-lg">
+            <svg class="animate-spin -ml-1 mr-3 h-8 w-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="mt-4 text-gray-700">Loading...</p>
+        </div>
+    </div>
+
+    <div id="auth-container" class="w-full max-w-md bg-white p-8 rounded-xl shadow-lg mt-8 hidden">
+        <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Civic Reporting</h2>
+        <div id="auth-message-box" class="hidden p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg" role="alert"></div>
+        <div id="logged-in-message" class="hidden text-center text-gray-600 mb-4">
+            <p class="mb-2">You are logged in as a guest. To submit reports, you need to sign in with an official account.</p>
+        </div>
+        <div class="flex justify-center items-center gap-4">
+            <button id="login-btn" class="w-full px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors duration-200">Login as Admin</button>
+        </div>
+    </div>
+
+    <div id="main-app" class="w-full p-4 md:p-8 bg-white rounded-xl shadow-lg mt-8 max-w-5xl hidden">
+        <header class="flex flex-col md:flex-row items-center justify-between pb-4 border-b border-gray-200 mb-4">
+            <div class="flex items-center space-x-2">
+                <i class="ph ph-map-pin-line text-3xl text-blue-600"></i>
+                <h1 class="text-2xl font-bold text-gray-800">Civic Reporting Dashboard</h1>
+            </div>
+            <div class="flex items-center space-x-4 mt-4 md:mt-0">
+                <span id="user-info" class="text-gray-600"></span>
+                <button id="logout-btn" class="px-3 py-1 bg-red-500 text-white rounded-xl text-sm hover:bg-red-600 transition-colors">Logout</button>
+            </div>
+        </header>
+
+        <div id="citizen-view" class="grid grid-cols-1 lg:grid-cols-2 gap-8 hidden">
+            <!-- Map Section -->
+            <div class="space-y-4">
+                <h2 class="text-xl font-semibold text-gray-700">Reported Issues on the Map</h2>
+                <div id="map"></div>
+            </div>
+
+            <!-- Report Submission Form -->
+            <div class="space-y-4">
+                <h2 class="text-xl font-semibold text-gray-700">Submit a New Report</h2>
+                <form id="report-form" class="space-y-4 p-6 bg-gray-50 rounded-xl border border-gray-200 shadow-sm">
+                    <div>
+                        <label for="category" class="block text-sm font-medium text-gray-700">Category</label>
+                        <select id="category" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">Select a Category</option>
+                            <option value="Pothole">Pothole</option>
+                            <option value="Graffiti">Graffiti</option>
+                            <option value="Broken Streetlight">Broken Streetlight</option>
+                            <option value="Park Maintenance">Park Maintenance</option>
+                            <option value="Trash & Debris">Trash & Debris</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="description" class="block text-sm font-medium text-gray-700">Description</label>
+                        <textarea id="description" rows="3" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"></textarea>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-700 mb-1">Location on Map</p>
+                        <div class="flex items-center space-x-2 text-gray-500 text-sm">
+                            <i class="ph ph-map-pin-line"></i>
+                            <span id="location-text">Click on the map to set location.</span>
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors duration-200">
+                        <span id="submit-text">Submit Report</span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- My Reports Section -->
+            <div class="lg:col-span-2 space-y-4">
+                <h2 class="text-xl font-semibold text-gray-700">My Reports</h2>
+                <div id="my-reports-list" class="space-y-4">
+                    <p class="text-center text-gray-500 p-8">No reports submitted yet.</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="admin-view" class="hidden">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4">Admin Dashboard</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+                <div class="p-6 bg-blue-100 text-blue-800 rounded-xl shadow-sm">
+                    <p class="text-sm font-medium">Total Reports</p>
+                    <p id="total-reports-count" class="text-3xl font-bold mt-2">0</p>
+                </div>
+                <div class="p-6 bg-yellow-100 text-yellow-800 rounded-xl shadow-sm">
+                    <p class="text-sm font-medium">In Progress</p>
+                    <p id="in-progress-count" class="text-3xl font-bold mt-2">0</p>
+                </div>
+                <div class="p-6 bg-green-100 text-green-800 rounded-xl shadow-sm">
+                    <p class="text-sm font-medium">Resolved</p>
+                    <p id="resolved-count" class="text-3xl font-bold mt-2">0</p>
+                </div>
+            </div>
+            <div id="admin-reports-list" class="space-y-4">
+                <p class="text-center text-gray-500 p-8">No reports found.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Modal -->
+    <div id="custom-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-white p-6 rounded-xl shadow-xl w-full max-w-sm">
+            <h3 id="modal-title" class="text-xl font-bold mb-4"></h3>
+            <p id="modal-message" class="text-gray-700 mb-6"></p>
+            <button id="modal-close-btn" class="w-full px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors">OK</button>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"></script>
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-p4NxAoJBhIINfQ7oFpSlw8yS1c6e0vL6L6A7zW2g6Z0=" crossorigin=""></script>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, doc, updateDoc, onSnapshot, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Set Firebase debug logging
+        setLogLevel('debug');
+
+        // Global variables provided by the canvas environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // --- DOM Elements ---
+        const loader = document.getElementById('loader');
+        const authContainer = document.getElementById('auth-container');
+        const authMessageBox = document.getElementById('auth-message-box');
+        const loginBtn = document.getElementById('login-btn');
+        const mainApp = document.getElementById('main-app');
+        const userInfo = document.getElementById('user-info');
+        const logoutBtn = document.getElementById('logout-btn');
+        const citizenView = document.getElementById('citizen-view');
+        const adminView = document.getElementById('admin-view');
+        const reportForm = document.getElementById('report-form');
+        const myReportsList = document.getElementById('my-reports-list');
+        const adminReportsList = document.getElementById('admin-reports-list');
+        const totalReportsCount = document.getElementById('total-reports-count');
+        const inProgressCount = document.getElementById('in-progress-count');
+        const resolvedCount = document.getElementById('resolved-count');
+        const modal = document.getElementById('custom-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMessage = document.getElementById('modal-message');
+        const modalCloseBtn = document.getElementById('modal-close-btn');
+
+        // --- Firebase Initialization ---
+        let app, db, auth;
+        let map, mapMarker;
+        const ADMIN_EMAIL = 'admin@example.com'; // Hardcoded admin email for this demo
+
+        async function startApp() {
+            try {
+                if (Object.keys(firebaseConfig).length === 0) {
+                    throw new Error("Firebase config is missing. Please ensure your project is properly configured.");
+                }
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        console.log("User is authenticated:", user);
+                        await handleAuthStateChange(user);
+                    } else {
+                        console.log("No user is signed in. Attempting anonymous sign-in.");
+                        try {
+                             await signInAnonymously(auth);
+                        } catch (e) {
+                            console.error("Anonymous sign-in failed:", e);
+                            displayMessage(authMessageBox, `Error signing in anonymously: ${e.message}`);
+                            loader.classList.add('hidden');
+                            authContainer.classList.remove('hidden');
+                        }
+                    }
+                });
+
+            } catch (error) {
+                console.error("Firebase initialization failed:", error);
+                displayMessage(authMessageBox, `Error initializing the app. Check the console for details: ${error.message}`);
+                loader.classList.add('hidden');
+                authContainer.classList.remove('hidden');
+            }
+        }
+        
+        // --- Helper Functions ---
+        function displayMessage(element, message) {
+            element.textContent = message;
+            element.classList.remove('hidden');
+        }
+
+        function showModal(title, message) {
+            modalTitle.textContent = title;
+            modalMessage.textContent = message;
+            modal.classList.remove('hidden');
+        }
+
+        function hideModal() {
+            modal.classList.add('hidden');
+        }
+
+        function createReportCard(report, isAdmin = false) {
+            const card = document.createElement('div');
+            card.className = `p-4 rounded-xl shadow-sm border ${getStatusColor(report.status)}`;
+            card.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-gray-800">${report.category}</h3>
+                    <span class="px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeColor(report.status)}">${report.status}</span>
+                </div>
+                <p class="text-sm text-gray-600 mt-2">${report.description}</p>
+                ${isAdmin ? `<p class="text-xs text-gray-500 mt-2">Reporter: ${report.reporterEmail}</p>` : ''}
+                <p class="text-xs text-gray-500 mt-1">Submitted: ${new Date(report.createdAt).toLocaleString()}</p>
+                ${isAdmin ? `
+                    <div class="mt-4 flex items-center space-x-2">
+                        <select class="status-select px-2 py-1 text-sm rounded-md border-gray-300">
+                            <option value="Reported" ${report.status === 'Reported' ? 'selected' : ''}>Reported</option>
+                            <option value="In Progress" ${report.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+                            <option value="Resolved" ${report.status === 'Resolved' ? 'selected' : ''}>Resolved</option>
+                        </select>
+                        <button data-report-id="${report.id}" class="update-status-btn px-3 py-1 bg-blue-600 text-white rounded-xl text-sm hover:bg-blue-700 transition-colors">Update</button>
+                    </div>
+                ` : ''}
+            `;
+            return card;
+        }
+
+        function getStatusColor(status) {
+            switch(status) {
+                case 'Reported': return 'border-red-400';
+                case 'In Progress': return 'border-yellow-400';
+                case 'Resolved': return 'border-green-400';
+                default: return 'border-gray-300';
+            }
+        }
+
+        function getStatusBadgeColor(status) {
+            switch(status) {
+                case 'Reported': return 'bg-red-200 text-red-800';
+                case 'In Progress': return 'bg-yellow-200 text-yellow-800';
+                case 'Resolved': return 'bg-green-200 text-green-800';
+                default: return 'bg-gray-200 text-gray-800';
+            }
+        }
+
+        function getIconUrl(status) {
+            const base = "https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/";
+            switch(status) {
+                case 'Reported': return `${base}marker-icon-2x-red.png`;
+                case 'In Progress': return `${base}marker-icon-2x-yellow.png`;
+                case 'Resolved': return `${base}marker-icon-2x-green.png`;
+                default: return `${base}marker-icon-2x-grey.png`;
+            }
+        }
+
+        // --- Core Application Logic ---
+        async function handleAuthStateChange(user) {
+            if (user) {
+                let userDoc = await getDoc(doc(db, "artifacts", appId, "users", user.uid));
+                let role = userDoc.exists() ? userDoc.data().role : 'citizen';
+                
+                // If this is the initial anonymous sign-in, create a user document
+                if (user.isAnonymous) {
+                    try {
+                        await updateDoc(doc(db, "artifacts", appId, "users", user.uid), {
+                            userId: user.uid,
+                            role: 'citizen',
+                            email: 'guest',
+                            isAnonymous: true
+                        }, { merge: true });
+                    } catch (e) {
+                         await setDoc(doc(db, "artifacts", appId, "users", user.uid), {
+                            userId: user.uid,
+                            role: 'citizen',
+                            email: 'guest',
+                            isAnonymous: true
+                        });
+                    }
+                    console.log("Anonymous user document created/updated.");
+                }
+
+                userInfo.textContent = role === 'admin' ? 'Admin User' : 'Citizen';
+                loader.classList.add('hidden');
+                authContainer.classList.add('hidden');
+                mainApp.classList.remove('hidden');
+
+                if (role === 'admin') {
+                    citizenView.classList.add('hidden');
+                    adminView.classList.remove('hidden');
+                    listenForAdminReports();
+                } else {
+                    citizenView.classList.remove('hidden');
+                    adminView.classList.add('hidden');
+                    listenForCitizenReports(user.uid);
+                    setupMap(user.uid);
+                }
+            }
+        }
+
+        // --- Map & Report Logic ---
+        function setupMap(userId) {
+            if (!map) {
+                map = L.map('map').setView([17.0, 81.0], 13);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                }).addTo(map);
+            }
+            
+            map.on('click', function(e) {
+                if (mapMarker) {
+                    map.removeLayer(mapMarker);
+                }
+                mapMarker = L.marker(e.latlng).addTo(map);
+                document.getElementById('location-text').textContent = `Location set to Lat: ${e.latlng.lat.toFixed(4)}, Lng: ${e.latlng.lng.toFixed(4)}`;
+            });
+
+            listenForAllReportsOnMap();
+        }
+
+        function listenForAllReportsOnMap() {
+            onSnapshot(collection(db, "artifacts", appId, "public", "data", "reports"), (snapshot) => {
+                const reports = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                
+                // Clear existing markers
+                map.eachLayer(layer => {
+                    if (layer instanceof L.Marker) {
+                        map.removeLayer(layer);
+                    }
+                });
+                
+                reports.forEach(report => {
+                    if (report.location) {
+                        const iconUrl = getIconUrl(report.status);
+                        const customIcon = L.icon({
+                            iconUrl: iconUrl,
+                            iconSize: [25, 41],
+                            iconAnchor: [12, 41],
+                            popupAnchor: [1, -34]
+                        });
+                        const marker = L.marker([report.location.latitude, report.location.longitude], {icon: customIcon}).addTo(map);
+                        marker.bindPopup(`<b>${report.category}</b><br>${report.description}<br>Status: ${report.status}`);
+                    }
+                });
+            });
+        }
+
+        // --- Firebase Listeners ---
+        function listenForCitizenReports(userId) {
+            if (!db) return;
+            const reportsRef = collection(db, "artifacts", appId, "users", userId, "reports");
+            onSnapshot(reportsRef, (snapshot) => {
+                myReportsList.innerHTML = '';
+                if (snapshot.empty) {
+                    myReportsList.innerHTML = `<p class="text-center text-gray-500 p-8">No reports submitted yet.</p>`;
+                } else {
+                    snapshot.forEach(doc => {
+                        const report = { id: doc.id, ...doc.data() };
+                        myReportsList.appendChild(createReportCard(report));
+                    });
+                }
+            }, (error) => {
+                console.error("Error fetching citizen reports:", error);
+                displayMessage(myReportsList, `Error loading your reports. Please try again.`);
+            });
+        }
+
+        function listenForAdminReports() {
+            if (!db) return;
+            const reportsRef = collection(db, "artifacts", appId, "public", "data", "reports");
+            onSnapshot(reportsRef, (snapshot) => {
+                adminReportsList.innerHTML = '';
+                let total = 0, inProgress = 0, resolved = 0;
+                
+                if (snapshot.empty) {
+                    adminReportsList.innerHTML = `<p class="text-center text-gray-500 p-8">No reports found.</p>`;
+                } else {
+                    snapshot.forEach(doc => {
+                        const report = { id: doc.id, ...doc.data() };
+                        adminReportsList.appendChild(createReportCard(report, true));
+                        total++;
+                        if (report.status === 'In Progress') inProgress++;
+                        if (report.status === 'Resolved') resolved++;
+                    });
+                }
+                
+                totalReportsCount.textContent = total;
+                inProgressCount.textContent = inProgress;
+                resolvedCount.textContent = resolved;
+            }, (error) => {
+                console.error("Error fetching admin reports:", error);
+                displayMessage(adminReportsList, `Error loading admin reports. Please try again.`);
+            });
+        }
+
+        // --- Event Listeners ---
+        loginBtn.addEventListener('click', async () => {
+            const auth = getAuth();
+            try {
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                    // The onAuthStateChanged listener will handle the UI update
+                } else {
+                    displayMessage(authMessageBox, 'No authentication token available. Cannot log in as admin.');
+                }
+            } catch (error) {
+                console.error("Login failed:", error);
+                displayMessage(authMessageBox, `Login failed: ${error.message}`);
+            }
+        });
+        
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await signOut(auth);
+                window.location.reload(); // Reload to reset the UI state
+            } catch (error) {
+                console.error("Logout failed:", error);
+                displayMessage(authMessageBox, `Logout failed: ${error.message}`);
+            }
+        });
+
+        reportForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const user = auth.currentUser;
+            if (!user) {
+                showModal("Submission Error", "Please log in to submit a report.");
+                return;
+            }
+            if (!mapMarker) {
+                showModal("Submission Error", "Please click on the map to set a location.");
+                return;
+            }
+
+            const reportData = {
+                userId: user.uid,
+                reporterEmail: user.email || 'guest',
+                category: document.getElementById('category').value,
+                description: document.getElementById('description').value,
+                location: {
+                    latitude: mapMarker.getLatLng().lat,
+                    longitude: mapMarker.getLatLng().lng,
+                },
+                status: 'Reported',
+                createdAt: Date.now(),
+            };
+            
+            try {
+                // Save to user's private collection
+                const userReportsRef = collection(db, "artifacts", appId, "users", user.uid, "reports");
+                await addDoc(userReportsRef, reportData);
+                
+                // Save to public collection for admin dashboard and map
+                const publicReportsRef = collection(db, "artifacts", appId, "public", "data", "reports");
+                await addDoc(publicReportsRef, reportData);
+
+                reportForm.reset();
+                if (mapMarker) {
+                    map.removeLayer(mapMarker);
+                    mapMarker = null;
+                }
+                document.getElementById('location-text').textContent = 'Click on the map to set location.';
+                showModal("Success!", "Report submitted successfully!");
+            } catch (error) {
+                console.error("Error submitting report:", error);
+                showModal("Submission Failed", `Failed to submit report. Error: ${error.message}`);
+            }
+        });
+
+        // Event delegation for admin update buttons
+        adminReportsList.addEventListener('click', async (e) => {
+            if (e.target.classList.contains('update-status-btn')) {
+                const button = e.target;
+                const reportId = button.dataset.reportId;
+                const newStatus = button.closest('.flex').querySelector('.status-select').value;
+                
+                try {
+                    const reportRef = doc(db, "artifacts", appId, "public", "data", "reports", reportId);
+                    await updateDoc(reportRef, { status: newStatus, updatedAt: Date.now() });
+                    showModal("Success!", `Status updated for report ${reportId}`);
+                } catch (error) {
+                    console.error("Error updating status:", error);
+                    showModal("Update Failed", `Failed to update status. Error: ${error.message}`);
+                }
+            }
+        });
+        
+        modalCloseBtn.addEventListener('click', hideModal);
+
+        // Start the application
+        startApp();
+    </script>
+</body>
+</html>
