@@ -1,109 +1,104 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Nagara Seva</title>
 
-  <!-- Leaflet CSS -->
+  <!-- Google font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 
-  <!-- Custom CSS -->
-  <link rel="stylesheet" href="style.css">
+  <!-- App CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"/>
 </head>
 <body>
-
-<header>
-  <h1>Nagara Seva</h1>
-</header>
-
-<div class="container-wrapper">
-  <div class="container">
-
-    <!-- Home / login selection -->
-    <div id="home">
-      <h2>Login to Nagara Seva</h2>
-      <p>Choose your login type:</p>
-      <button class="btn" onclick="showSection('clientLogin')">Client Login</button>
-      <button class="btn officer-btn" onclick="showSection('officerLogin')">Officer Login</button>
+  <header>
+    <div class="header-inner">
+      <h1>Nagara Seva</h1>
+      <p class="subtitle">Report issues · Track progress · Keep the city clean</p>
     </div>
+  </header>
 
-    <!-- Client login -->
-    <div id="clientLogin" class="hidden">
-      <h2>Client Login</h2>
-      <form onsubmit="clientLogin(event)">
-        <input type="email" placeholder="Email" required>
-        <input type="password" placeholder="Password" required>
-        <button class="btn">Login</button>
-      </form>
-      <a class="link" onclick="showSection('createAccount')">New here? Create Account</a><br>
-      <a class="link" onclick="goHome()">← Back to Home</a>
-    </div>
-
-    <!-- Officer login -->
-    <div id="officerLogin" class="hidden">
-      <h2>Officer Login</h2>
-      <form onsubmit="officerLogin(event)">
-        <input type="text" placeholder="Officer ID" required>
-        <input type="password" placeholder="Password" required>
-        <button class="btn officer-btn">Login</button>
-      </form>
-      <a class="link" onclick="goHome()">← Back to Home</a>
-    </div>
-
-    <!-- Client account creation -->
-    <div id="createAccount" class="hidden">
-      <h2>Create Client Account</h2>
-      <form onsubmit="return false;">
-        <input type="text" placeholder="Full Name" required>
-        <input type="email" placeholder="Email" required>
-        <input type="password" placeholder="Password" required>
-        <input type="password" placeholder="Confirm Password" required>
-        <button class="btn">Sign Up</button>
-      </form>
-      <a class="link" onclick="showSection('clientLogin')">← Back to Client Login</a>
-    </div>
-
-    <!-- Issue reporting page -->
-    <div id="issueReporting" class="hidden">
-      <h2>Report an Issue</h2>
-      <form id="issueForm" onsubmit="reportIssue(event)">
-        <input type="text" placeholder="Issue Title" required>
-        <textarea placeholder="Describe the issue..." required></textarea>
-        
-        <div class="section-heading">Upload Photo</div>
-        <input type="file" accept="image/*" required>
-
-        <div class="section-heading">Issue Location</div>
-        <input type="text" id="location" placeholder="Enter location or use button" required>
-        <button type="button" class="btn" onclick="getLocation()">📍 Use Current Location</button>
-
-        <button class="btn" type="submit">Submit Issue</button>
-      </form>
-      <a class="link" onclick="goHome()">← Logout</a>
-    </div>
-
-    <!-- Officer Issue Details Page -->
-    <div id="issueDetails" class="hidden">
-      <h2>Issue Details</h2>
-      <div class="issue-details-container-vertical">
-        <div class="issue-map" id="issueMap">
-          <h3>Location Map</h3>
-          <div id="leafletMap" style="height:300px; border-radius:8px;"></div>
-        </div>
-        <div class="issue-info" id="issueInfo">
-          <!-- Empty bottom frame -->
-        </div>
+  <div class="main">
+    <!-- LEFT: Issue List -->
+    <aside class="left-frame">
+      <div class="left-inner">
+        <h2>Issues</h2>
+        <div id="issueList" class="issue-list">Loading...</div>
       </div>
-      <a class="link" onclick="goHome()">← Logout</a>
-    </div>
+    </aside>
 
+    <!-- RIGHT: Main content -->
+    <main class="right-frame">
+      <div class="container">
+
+        <!-- HOME -->
+        <section id="home">
+          <div class="controls">
+            <div class="control-row">
+              <select id="statusFilter" onchange="loadIssues()">
+                <option value="All">All Status</option>
+                <option value="Reported">Reported</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Solved">Solved</option>
+              </select>
+
+              <select id="dateFilter" onchange="loadIssues()">
+                <option value="All">All Time</option>
+                <option value="7">Last 7 Days</option>
+                <option value="30">Last 30 Days</option>
+              </select>
+
+              <input id="searchBox" type="text" placeholder="Search title or description..." oninput="loadIssues()">
+            </div>
+
+            <div class="control-row row-right">
+              <button class="btn" onclick="showSection('reportIssue')">➕ Report Issue</button>
+              <button class="btn outline" onclick="showSection('officerDashboard')">Officer Dashboard</button>
+            </div>
+          </div>
+
+          <div id="publicMap" class="map"></div>
+        </section>
+
+        <!-- REPORT ISSUE -->
+        <section id="reportIssue" class="hidden">
+          <h2>Report an Issue</h2>
+          <input id="issueTitle" placeholder="Title">
+          <textarea id="issueDesc" placeholder="Describe the issue..."></textarea>
+          <input id="issueLocation" placeholder="latitude,lng (or use location button)">
+          <div class="row">
+            <input type="file" id="issuePhoto" accept="image/*">
+            <button class="btn small" onclick="useCurrentLocation()">📍 Use Current Location</button>
+          </div>
+          <div class="row">
+            <button class="btn" onclick="submitIssue()">Submit</button>
+            <button class="btn outline" onclick="showSection('home')">Cancel</button>
+          </div>
+          <div id="clientMap" class="map"></div>
+        </section>
+
+        <!-- OFFICER DASHBOARD -->
+        <section id="officerDashboard" class="hidden">
+          <div class="officer-header">
+            <h2>Officer Dashboard</h2>
+            <div>
+              <button class="btn outline" onclick="showSection('home')">Back to Public View</button>
+            </div>
+          </div>
+
+          <div id="officerList" class="issue-list">Loading...</div>
+        </section>
+
+      </div>
+    </main>
   </div>
-</div>
 
-<!-- Leaflet JS -->
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<!-- Custom JS -->
-<script src="script.js"></script>
+  <!-- Leaflet + App JS -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>
